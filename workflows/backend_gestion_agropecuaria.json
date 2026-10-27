@@ -1,0 +1,1083 @@
+{
+  "name": "Backend Gestion Agropecuaria (Equipo 2)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "tactos",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "c03a5459-820e-4961-aac9-35eb58243c50",
+      "name": "WH Crear Tacto",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1100,
+        0
+      ],
+      "webhookId": "crear-tacto"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || {};\nconst req = ['caravana','fecha','resultado'];\nconst falt = req.filter(c => body[c]===undefined || body[c]==='');\nif (falt.length) return [{ json: { __valido:false, __faltantes:falt, body } }];\nreturn [{ json: { __valido:true, body } }];"
+      },
+      "id": "d8b3dcdd-d387-4a11-9e9a-7024ff58139a",
+      "name": "Validar Campos Tacto",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -900,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.__valido }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f587d3a5-14f6-4db3-99e3-bb9ca78cdced",
+      "name": "IF Datos Validos Tacto",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -700,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "TU_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "vacas",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "caravana",
+              "lookupValue": "={{ $json.body.caravana }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "aa0e74ec-097a-4f18-9c00-3a839df42e1f",
+      "name": "Buscar Caravana T",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -480,
+        -100
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.caravana }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ded2de6e-34ce-4ac4-b48b-9715c9a8db7d",
+      "name": "IF Caravana Existe T",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -260,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// === REGLA DE NEGOCIO (EQUIPO 1) ===\n// Ej fecha probable de parto: 283 dias de gestacion bovina.\nconst body = $('WH Crear Tacto').first().json.body;\n// const dias = 283;\n// const fp = new Date(new Date(body.fecha).getTime() + (dias - (body.dias_gestacion||0))*86400000);\nreturn [{ json: {\n  id: 'T-' + Date.now(),\n  caravana: body.caravana,\n  fecha: body.fecha,\n  resultado: body.resultado,\n  dias_gestacion: body.dias_gestacion || '',\n  fecha_probable_parto: '', // <- la llena la regla del Equipo 1\n  timestamp: new Date().toISOString()\n} }];"
+      },
+      "id": "f0d77927-554c-4444-8105-520326240fc3",
+      "name": "Regla Negocio Tacto (E1)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -40,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "TU_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "tactos",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "matchingColumns": []
+        },
+        "options": {}
+      },
+      "id": "a30a0569-6983-43a5-84b9-b25a4d3730a3",
+      "name": "Guardar Tacto",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        180,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "destinatario@ejemplo.com",
+        "subject": "=Nuevo tacto - Caravana {{ $json.caravana }}",
+        "message": "=<h2>Tacto registrado</h2><ul><li><b>ID:</b> {{ $json.id }}</li><li><b>Caravana:</b> {{ $json.caravana }}</li><li><b>Fecha:</b> {{ $json.fecha }}</li><li><b>Resultado:</b> {{ $json.resultado }}</li><li><b>Dias gestacion:</b> {{ $json.dias_gestacion }}</li><li><b>Fecha probable parto:</b> {{ $json.fecha_probable_parto }}</li></ul>",
+        "options": {}
+      },
+      "id": "672e3409-f4d9-4d58-9b23-a527abf27e09",
+      "name": "Email Tacto",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        400,
+        -200
+      ],
+      "webhookId": "37dbde84-e684-44ca-9b24-00743bf4e9bf"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok:true, data: $('Regla Negocio Tacto (E1)').first().json }) }}",
+        "options": {
+          "responseCode": 201,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "e49e31e2-659d-4ff9-bddd-82618d9b2fa3",
+      "name": "OK Tacto",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        620,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok:false, error: 'La caravana ' + $('WH Crear Tacto').first().json.body.caravana + ' no existe en la planilla maestra' }) }}",
+        "options": {
+          "responseCode": 404,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "59099493-e243-4036-83d0-556e1cfea373",
+      "name": "404 Tacto",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok:false, error:'Faltan campos obligatorios', campos: $json.__faltantes }) }}",
+        "options": {
+          "responseCode": 400,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "fea2f414-a7ee-4b87-bf4c-14ef1587cce4",
+      "name": "400 Tacto",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -480,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pariciones",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "a13c9c66-7615-434d-88b8-c78dff4752f5",
+      "name": "WH Crear Paricion",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1100,
+        700
+      ],
+      "webhookId": "crear-paricion"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || {};\nconst req = ['caravana','fecha','sexo_cria'];\nconst falt = req.filter(c => body[c]===undefined || body[c]==='');\nif (falt.length) return [{ json: { __valido:false, __faltantes:falt, body } }];\nreturn [{ json: { __valido:true, body } }];"
+      },
+      "id": "f3ff03f9-4481-4024-9f07-f7dbc0457e0e",
+      "name": "Validar Campos Paricion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -900,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.__valido }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "52d67cf9-8899-433c-94ec-5cd620b4abab",
+      "name": "IF Datos Validos Paricion",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -700,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "TU_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "vacas",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "caravana",
+              "lookupValue": "={{ $json.body.caravana }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d73f83f3-9861-4a73-a6ad-d30ed32fa2b7",
+      "name": "Buscar Caravana P",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -480,
+        600
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.caravana }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "38b424e3-d287-415f-8650-8dfde3168d0b",
+      "name": "IF Caravana Existe P",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -260,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// === REGLA DE NEGOCIO (EQUIPO 1) ===\n// Ej: impedir paricion sin tacto positivo previo.\nconst body = $('WH Crear Paricion').first().json.body;\nreturn [{ json: {\n  id: 'P-' + Date.now(),\n  caravana: body.caravana,\n  fecha: body.fecha,\n  sexo_cria: body.sexo_cria,\n  peso_nacer: body.peso_nacer || '',\n  observaciones: body.observaciones || '',\n  timestamp: new Date().toISOString()\n} }];"
+      },
+      "id": "d945777c-7bfb-4d97-b7ef-74092af62364",
+      "name": "Regla Negocio Paricion (E1)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -40,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "TU_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "pariciones",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "matchingColumns": []
+        },
+        "options": {}
+      },
+      "id": "662800ef-75ce-485d-b942-509e81ab569e",
+      "name": "Guardar Paricion",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        180,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "destinatario@ejemplo.com",
+        "subject": "=Nueva paricion - Caravana {{ $json.caravana }}",
+        "message": "=<h2>Paricion registrada</h2><ul><li><b>ID:</b> {{ $json.id }}</li><li><b>Caravana:</b> {{ $json.caravana }}</li><li><b>Fecha:</b> {{ $json.fecha }}</li><li><b>Sexo cria:</b> {{ $json.sexo_cria }}</li><li><b>Peso al nacer:</b> {{ $json.peso_nacer }}</li><li><b>Observaciones:</b> {{ $json.observaciones }}</li></ul>",
+        "options": {}
+      },
+      "id": "56fec502-42e7-4e50-9b81-7b46f62d6e21",
+      "name": "Email Paricion",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        400,
+        500
+      ],
+      "webhookId": "04ff555e-3180-48e7-ae7c-fb4727655964"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok:true, data: $('Regla Negocio Paricion (E1)').first().json }) }}",
+        "options": {
+          "responseCode": 201,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "a3e78b88-3742-40a9-928c-3fa8b23f02f7",
+      "name": "OK Paricion",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        620,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok:false, error: 'La caravana ' + $('WH Crear Paricion').first().json.body.caravana + ' no existe en la planilla maestra' }) }}",
+        "options": {
+          "responseCode": 404,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "11d4b42e-ac10-4fee-8ab6-bed3b1c0e1b6",
+      "name": "404 Paricion",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        740
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok:false, error:'Faltan campos obligatorios', campos: $json.__faltantes }) }}",
+        "options": {
+          "responseCode": 400,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "b945e8fb-4ac8-479e-b682-af0a1089b192",
+      "name": "400 Paricion",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -480,
+        820
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "tactos",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "842042ff-e0b3-4f78-acfc-4005f871a77f",
+      "name": "WH Listar Tactos",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1100,
+        1500
+      ],
+      "webhookId": "listar-tactos"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "TU_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "tactos",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "aca986ab-5d97-4e56-bea7-9c824d839c70",
+      "name": "Leer Tactos",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -880,
+        1500
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nreturn [{ json: { ok:true, count: rows.length, data: rows } }];"
+      },
+      "id": "1561bf6e-bf51-4144-9a92-a1531accdef5",
+      "name": "Armar Lista Tactos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -660,
+        1500
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "eaecc477-8b8a-4544-bec2-a846f3a97822",
+      "name": "Resp Listar Tactos",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -440,
+        1500
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "pariciones",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "695d6b28-8120-4a5f-a735-05d10e2b0247",
+      "name": "WH Listar Pariciones",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1100,
+        1900
+      ],
+      "webhookId": "listar-pariciones"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "TU_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "pariciones",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "816492af-be2f-4134-b13b-6639088cc776",
+      "name": "Leer Pariciones",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -880,
+        1900
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nreturn [{ json: { ok:true, count: rows.length, data: rows } }];"
+      },
+      "id": "7ee23b6c-6845-4dfd-aee1-f60ff66016b4",
+      "name": "Armar Lista Pariciones",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -660,
+        1900
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "ea3c995b-97af-4427-824c-fbc3191042be",
+      "name": "Resp Listar Pariciones",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -440,
+        1900
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "tactos/positivos",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "2d98c076-c0ca-4780-bece-a71a8f0567f5",
+      "name": "WH Tactos Positivos",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1100,
+        2300
+      ],
+      "webhookId": "tactos-positivos"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "TU_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "tactos",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "03eee3de-b45e-424d-8a7a-4fe094080ba7",
+      "name": "Leer Tactos (filtro)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -880,
+        2300
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Consulta filtrada: solo tactos con resultado positivo\nconst rows = $input.all().map(i => i.json);\nconst pos = rows.filter(r => String(r.resultado||'').toLowerCase() === 'positivo');\nreturn [{ json: { ok:true, filtro:'resultado=positivo', count: pos.length, data: pos } }];"
+      },
+      "id": "4ae90732-d579-48f6-ab83-4619eab9ec18",
+      "name": "Filtrar Positivos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -660,
+        2300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "134f1ad6-d471-435c-8a37-c990742c5d6c",
+      "name": "Resp Tactos Positivos",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -440,
+        2300
+      ]
+    }
+  ],
+  "connections": {
+    "WH Crear Tacto": {
+      "main": [
+        [
+          {
+            "node": "Validar Campos Tacto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar Campos Tacto": {
+      "main": [
+        [
+          {
+            "node": "IF Datos Validos Tacto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Datos Validos Tacto": {
+      "main": [
+        [
+          {
+            "node": "Buscar Caravana T",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "400 Tacto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Caravana T": {
+      "main": [
+        [
+          {
+            "node": "IF Caravana Existe T",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Caravana Existe T": {
+      "main": [
+        [
+          {
+            "node": "Regla Negocio Tacto (E1)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "404 Tacto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Regla Negocio Tacto (E1)": {
+      "main": [
+        [
+          {
+            "node": "Guardar Tacto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar Tacto": {
+      "main": [
+        [
+          {
+            "node": "Email Tacto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Tacto": {
+      "main": [
+        [
+          {
+            "node": "OK Tacto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WH Crear Paricion": {
+      "main": [
+        [
+          {
+            "node": "Validar Campos Paricion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar Campos Paricion": {
+      "main": [
+        [
+          {
+            "node": "IF Datos Validos Paricion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Datos Validos Paricion": {
+      "main": [
+        [
+          {
+            "node": "Buscar Caravana P",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "400 Paricion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Caravana P": {
+      "main": [
+        [
+          {
+            "node": "IF Caravana Existe P",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Caravana Existe P": {
+      "main": [
+        [
+          {
+            "node": "Regla Negocio Paricion (E1)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "404 Paricion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Regla Negocio Paricion (E1)": {
+      "main": [
+        [
+          {
+            "node": "Guardar Paricion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar Paricion": {
+      "main": [
+        [
+          {
+            "node": "Email Paricion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Paricion": {
+      "main": [
+        [
+          {
+            "node": "OK Paricion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WH Listar Tactos": {
+      "main": [
+        [
+          {
+            "node": "Leer Tactos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Tactos": {
+      "main": [
+        [
+          {
+            "node": "Armar Lista Tactos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar Lista Tactos": {
+      "main": [
+        [
+          {
+            "node": "Resp Listar Tactos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WH Listar Pariciones": {
+      "main": [
+        [
+          {
+            "node": "Leer Pariciones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Pariciones": {
+      "main": [
+        [
+          {
+            "node": "Armar Lista Pariciones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar Lista Pariciones": {
+      "main": [
+        [
+          {
+            "node": "Resp Listar Pariciones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WH Tactos Positivos": {
+      "main": [
+        [
+          {
+            "node": "Leer Tactos (filtro)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Tactos (filtro)": {
+      "main": [
+        [
+          {
+            "node": "Filtrar Positivos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar Positivos": {
+      "main": [
+        [
+          {
+            "node": "Resp Tactos Positivos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

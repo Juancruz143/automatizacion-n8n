@@ -1,0 +1,279 @@
+{
+  "name": "TP Pipeline Migracion Excel Historicos - Independiente Ficticio",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "5585ec49-6062-422f-82c4-e10b752b1adf",
+      "name": "1. Manual Trigger - Demo",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        5376,
+        2512
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtHour": 3
+            }
+          ]
+        }
+      },
+      "id": "218dda0e-3266-4142-994e-13d653fc7e9a",
+      "name": "1. Schedule Trigger - Domingos madrugada",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        5376,
+        2736
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Este nodo simula filas leídas desde Excel.\n// En una implementación real, reemplazar por Google Drive/OneDrive + Spreadsheet File.\nconst filasExcel = [\n  {\n    \"DNI\": \"42.345.678\",\n    \"Apellido y nombre\": \"Suarez Mateo\",\n    \"Fecha nac.\": \"12/03/2014\",\n    \"Sexo\": \"M\",\n    \"Barrio\": \"Belgrano\",\n    \"Centro\": \"Centro Ninez Norte\",\n    \"Tipo de centro\": \"ninez\",\n    \"Escolarizado\": \"SI\",\n    \"Consumo\": \"no\",\n    \"Violencia familiar\": \"No\"\n  },\n  {\n    \"Documento\": \"30111222\",\n    \"Nombre completo\": \"Rodrigo Aguirre\",\n    \"Nacimiento\": \"1989-04-03\",\n    \"Género\": \"M\",\n    \"Zona\": \"Almagro\",\n    \"Dispositivo\": \"Centro de Dia Almagro\",\n    \"Modalidad\": \"dia\",\n    \"Tiene CUD\": \"sí\",\n    \"Situación de consumo\": \"S\",\n    \"Violencia\": \"no\"\n  },\n  {\n    \"Nro DNI\": \"\",\n    \"Persona\": \"Registro sin DNI\",\n    \"Fecha de nacimiento\": \"10/10/2010\",\n    \"Centro\": \"Centro Ninez Sur\",\n    \"Tipo dispositivo\": \"ninez\"\n  },\n  {\n    \"Doc\": \"42-345-678\",\n    \"Nombre\": \"Suarez Mateo\",\n    \"Nacimiento\": \"2014-03-12\",\n    \"Centro\": \"Centro Ninez Norte\",\n    \"Tipo de centro\": \"ninez\",\n    \"Escolarizado\": \"si\"\n  }\n];\n\nreturn filasExcel.map((fila, index) => ({\n  json: {\n    ...fila,\n    fuente_archivo: \"excel_historico_demo.xlsx\",\n    numero_fila: index + 2\n  }\n}));"
+      },
+      "id": "e45748b9-24e5-4df9-8dd6-0b4bc59d2212",
+      "name": "2. Ingesta Heterogenea - Exceles historicos ficticios",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5680,
+        2736
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all();\n\nfunction limpiarTexto(valor) {\n  if (valor === undefined || valor === null) return \"\";\n  return String(valor).trim();\n}\n\nfunction normalizarDNI(valor) {\n  return limpiarTexto(valor).replace(/[.\\-\\s]/g, \"\");\n}\n\nfunction normalizarSiNo(valor) {\n  const v = limpiarTexto(valor).toLowerCase();\n  if ([\"si\", \"sí\", \"s\", \"yes\", \"y\", \"1\", \"true\"].includes(v)) return \"sí\";\n  if ([\"no\", \"n\", \"0\", \"false\"].includes(v)) return \"no\";\n  return \"\";\n}\n\nfunction normalizarFecha(valor) {\n  if (!valor) return \"\";\n  const texto = limpiarTexto(valor);\n\n  if (/^\\d{4}-\\d{2}-\\d{2}$/.test(texto)) return texto;\n\n  const partes = texto.split(\"/\");\n  if (partes.length === 3) {\n    const [dia, mes, anio] = partes;\n    return `${anio.padStart(4, \"20\")}-${mes.padStart(2, \"0\")}-${dia.padStart(2, \"0\")}`;\n  }\n\n  const fecha = new Date(texto);\n  if (!isNaN(fecha)) return fecha.toISOString().slice(0, 10);\n\n  return \"\";\n}\n\nfunction tomarCampo(row, posiblesNombres) {\n  for (const nombre of posiblesNombres) {\n    if (row[nombre] !== undefined && row[nombre] !== null && row[nombre] !== \"\") {\n      return row[nombre];\n    }\n  }\n  return \"\";\n}\n\nreturn rows.map(item => {\n  const row = item.json;\n\n  const dni = normalizarDNI(tomarCampo(row, [\n    \"DNI\", \"Doc\", \"Documento\", \"Nro DNI\", \"Nro. DNI\", \"Número de documento\"\n  ]));\n\n  const nombreCompleto = limpiarTexto(tomarCampo(row, [\n    \"Apellido y nombre\", \"Nombre completo\", \"Persona\", \"Nombre\"\n  ]));\n\n  const fechaNacimiento = normalizarFecha(tomarCampo(row, [\n    \"Fecha de nacimiento\", \"Nacimiento\", \"Fecha nac.\", \"F. Nac\"\n  ]));\n\n  const sexo = limpiarTexto(tomarCampo(row, [\"Sexo\", \"Género\", \"Genero\"])).toUpperCase();\n\n  const barrio = limpiarTexto(tomarCampo(row, [\n    \"Barrio\", \"Zona\", \"Domicilio/Barrio\"\n  ]));\n\n  const centro = limpiarTexto(tomarCampo(row, [\n    \"Centro\", \"Dispositivo\", \"Nombre del centro\"\n  ]));\n\n  const tipoCentro = limpiarTexto(tomarCampo(row, [\n    \"Tipo de centro\", \"Tipo dispositivo\", \"Modalidad\"\n  ])).toLowerCase();\n\n  const escolarizado = normalizarSiNo(tomarCampo(row, [\n    \"Escolarizado\", \"¿Escolarizado?\", \"Va a la escuela\"\n  ]));\n\n  const cud = normalizarSiNo(tomarCampo(row, [\n    \"CUD\", \"Tiene CUD\", \"¿Tiene CUD?\"\n  ]));\n\n  const consumo = normalizarSiNo(tomarCampo(row, [\n    \"Consumo\", \"Consumo activo\", \"Situación de consumo\", \"¿Consumo?\"\n  ]));\n\n  const violencia = normalizarSiNo(tomarCampo(row, [\n    \"Violencia\", \"Violencia familiar\", \"Situación de violencia\"\n  ]));\n\n  const errores = [];\n  if (!dni) errores.push(\"DNI vacío\");\n  if (dni && !/^\\d{7,9}$/.test(dni)) errores.push(\"DNI con formato inválido\");\n  if (!nombreCompleto) errores.push(\"Falta nombre\");\n  if (!centro) errores.push(\"Falta centro\");\n  if (!tipoCentro) errores.push(\"Falta tipo de centro\");\n\n  return {\n    json: {\n      dni,\n      nombre_completo: nombreCompleto,\n      fecha_nacimiento: fechaNacimiento,\n      sexo,\n      barrio,\n      centro,\n      tipo_centro: tipoCentro,\n      escolarizado,\n      cud,\n      consumo_activo: consumo,\n      violencia_familiar: violencia,\n      estado: \"activo\",\n      fuente_archivo: row.fuente_archivo || \"Excel histórico\",\n      numero_fila: row.numero_fila || null,\n      fecha_migracion: new Date().toISOString(),\n      valido: errores.length === 0,\n      errores: errores.join(\"; \"),\n      registro_original: row\n    }\n  };\n});"
+      },
+      "id": "2631b577-bb09-496f-b72c-9220d2843a30",
+      "name": "3. Normalizacion - Unificar columnas y valores",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5968,
+        2736
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Deduplicación por DNI dentro de la misma ejecución.\n// Si el mismo DNI aparece dos veces, conserva el último registro normalizado.\nconst map = new Map();\n\nfor (const item of $input.all()) {\n  const dni = item.json.dni || `sin_dni_${item.json.numero_fila}`;\n  map.set(dni, item.json);\n}\n\nreturn Array.from(map.values()).map(row => ({ json: row }));"
+      },
+      "id": "2e3f5872-f44c-4e8b-9dc7-32b4d741b889",
+      "name": "4. Identificacion - Duplicados por DNI",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6272,
+        2736
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "21a1f4a6-a751-420b-9ce9-2220c8872373",
+              "leftValue": "={{ $json.valido }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5f184224-e799-48ac-bbed-c1f898dc27cc",
+      "name": "5. Ruteo y Errores - Registro valido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        6576,
+        2736
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Demo de carga incremental ficticia usando memoria interna del workflow.\n// En producción, reemplazar por Postgres/Supabase:\n// - UPSERT personas usando dni como clave única.\n// - UPSERT vinculos usando dni + centro como clave compuesta.\n\nconst sd = $getWorkflowStaticData(\"global\");\nif (!sd.migracion) {\n  sd.migracion = {\n    personas: {},\n    vinculos: {},\n    historial: []\n  };\n}\n\nconst salida = [];\n\nfor (const item of $input.all()) {\n  const r = item.json;\n\n  const personaKey = r.dni;\n  const vinculoKey = `${r.dni}__${r.centro}`;\n\n  const personaYaExistia = Boolean(sd.migracion.personas[personaKey]);\n  const vinculoYaExistia = Boolean(sd.migracion.vinculos[vinculoKey]);\n\n  sd.migracion.personas[personaKey] = {\n    dni: r.dni,\n    nombre_completo: r.nombre_completo,\n    fecha_nacimiento: r.fecha_nacimiento,\n    sexo: r.sexo,\n    barrio: r.barrio,\n    actualizado_en: r.fecha_migracion\n  };\n\n  sd.migracion.vinculos[vinculoKey] = {\n    dni: r.dni,\n    centro: r.centro,\n    tipo_centro: r.tipo_centro,\n    estado: r.estado,\n    escolarizado: r.escolarizado,\n    cud: r.cud,\n    consumo_activo: r.consumo_activo,\n    violencia_familiar: r.violencia_familiar,\n    fuente_archivo: r.fuente_archivo,\n    actualizado_en: r.fecha_migracion\n  };\n\n  sd.migracion.historial.push({\n    dni: r.dni,\n    centro: r.centro,\n    evento: personaYaExistia ? \"actualización/consolidación\" : \"alta inicial\",\n    fecha: r.fecha_migracion,\n    fuente_archivo: r.fuente_archivo,\n    numero_fila: r.numero_fila\n  });\n\n  salida.push({\n    json: {\n      ...r,\n      accion_persona: personaYaExistia ? \"actualizada\" : \"creada\",\n      accion_vinculo: vinculoYaExistia ? \"actualizado\" : \"creado\",\n      carga_incremental: true\n    }\n  });\n}\n\nreturn salida;"
+      },
+      "id": "da3f00b7-e766-4e31-9475-0c740acde632",
+      "name": "6. Carga Incremental Ficticia - Upsert Persona y Vinculo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6880,
+        2608
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Registros rechazados para revisión manual.\n// En producción, reemplazar por Google Sheets, Slack o tabla migracion_errores.\nreturn $input.all().map(item => ({\n  json: {\n    estado_revision: \"pendiente\",\n    motivo_error: item.json.errores,\n    dni: item.json.dni,\n    nombre_completo: item.json.nombre_completo,\n    centro: item.json.centro,\n    fuente_archivo: item.json.fuente_archivo,\n    numero_fila: item.json.numero_fila,\n    registro_original: item.json.registro_original\n  }\n}));"
+      },
+      "id": "17d44564-7f2a-4f1e-9c8e-95fea747de8b",
+      "name": "7. Log Ficticio - Errores para revision manual",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6880,
+        2864
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn [{\n  json: {\n    etapa: \"reporte_final_cargados\",\n    mensaje: \"Pipeline independiente ejecutado. Los registros validos fueron cargados en la base ficticia interna del workflow.\",\n    registros_cargados: items.length,\n    fecha_reporte: new Date().toISOString(),\n    nota: \"Para produccion se reemplaza la base ficticia por Supabase/Postgres. Para el TP, este flujo demuestra heterogeneidad, normalizacion, deduplicacion, incrementalidad y auditoria.\"\n  }\n}];"
+      },
+      "id": "1141264e-bb7a-4eba-8b74-f5e6be674c83",
+      "name": "8. Reporte Final - Cargados",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7168,
+        2608
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn [{\n  json: {\n    etapa: \"reporte_final_errores\",\n    mensaje: \"Pipeline independiente ejecutado. Los registros invalidos quedaron separados para revision manual.\",\n    registros_con_error: items.length,\n    fecha_reporte: new Date().toISOString(),\n    nota: \"Los errores no detienen el flujo completo, que es uno de los requisitos centrales del TP.\"\n  }\n}];"
+      },
+      "id": "47c847bb-0746-4e5e-8063-dc56b833e049",
+      "name": "8. Reporte Final - Errores",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7168,
+        2864
+      ]
+    },
+    {
+      "parameters": {
+        "content": "Pipeline independiente para el TP\n\nNo depende de la web ni de Supabase real.\n\nEntrada: filas simuladas de Excel historicos con formatos distintos.\nProceso: normalizacion, validacion, deduplicacion por DNI, carga incremental ficticia y log de errores.\nSalida: reporte final de cargados y errores.\n\nPara produccion se reemplaza el nodo de ingesta por lectura real de Excel y el nodo de carga por Supabase/Postgres.",
+        "height": 300,
+        "width": 420,
+        "color": 4
+      },
+      "id": "e9b4c376-4cf7-4e20-bd5b-f1ad43dfb9e6",
+      "name": "Nota - Alcance demo TP",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        5648,
+        2224
+      ]
+    }
+  ],
+  "connections": {
+    "1. Manual Trigger - Demo": {
+      "main": [
+        [
+          {
+            "node": "2. Ingesta Heterogenea - Exceles historicos ficticios",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Schedule Trigger - Domingos madrugada": {
+      "main": [
+        [
+          {
+            "node": "2. Ingesta Heterogenea - Exceles historicos ficticios",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Ingesta Heterogenea - Exceles historicos ficticios": {
+      "main": [
+        [
+          {
+            "node": "3. Normalizacion - Unificar columnas y valores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Normalizacion - Unificar columnas y valores": {
+      "main": [
+        [
+          {
+            "node": "4. Identificacion - Duplicados por DNI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Identificacion - Duplicados por DNI": {
+      "main": [
+        [
+          {
+            "node": "5. Ruteo y Errores - Registro valido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Ruteo y Errores - Registro valido?": {
+      "main": [
+        [
+          {
+            "node": "6. Carga Incremental Ficticia - Upsert Persona y Vinculo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "7. Log Ficticio - Errores para revision manual",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6. Carga Incremental Ficticia - Upsert Persona y Vinculo": {
+      "main": [
+        [
+          {
+            "node": "8. Reporte Final - Cargados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7. Log Ficticio - Errores para revision manual": {
+      "main": [
+        [
+          {
+            "node": "8. Reporte Final - Errores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}
